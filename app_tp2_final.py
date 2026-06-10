@@ -238,7 +238,9 @@ def base_layout(fig, a, p_top, titulo):
     return fig
 
 def csv_download(df, nombre, etiqueta):
-    csv = df.to_csv(index=False).encode("utf-8-sig")
+    # Separador ';' (no ',') porque los números usan coma decimal (formato AR).
+    # Así Excel con configuración regional argentina abre las columnas bien.
+    csv = df.to_csv(index=False, sep=";").encode("utf-8-sig")
     st.download_button(etiqueta, csv, file_name=nombre, mime="text/csv")
 
 # ======================================================================
@@ -265,56 +267,35 @@ with nav_cols[1]:
 
 # ----------------------------------------------------------------------
 # PANEL DE PARÁMETROS — franja superior plegable y centrada
-# (se oculta en la sección «Fórmulas», pero las variables se siguen
-#  calculando para no romper el resto de la app)
 # ----------------------------------------------------------------------
-# Tooltip del selector según la sección activa
-if seccion_activa in ("Subsidio (Ej. 1)", "Precio máximo (Ej. 2)"):
-    ayuda_preset = "Completar a, b, c, d y el valor de la política."
-else:
-    ayuda_preset = "Completar a, b, c, d"
-
-mostrar_panel = seccion_activa != "Fórmulas"
-
-if mostrar_panel:
-    panel = st.expander("⚙  Parámetros del mercado y carga de datos del enunciado",
-                        expanded=True)
-else:
-    panel = st.container()  # contenedor invisible: agrupa los widgets sin mostrarlos
-
-with panel:
-    if mostrar_panel:
-        pc1, pc2 = st.columns([2, 3])
-        with pc1:
-            preset = st.selectbox(
-                "Cargar datos del enunciado",
-                ["Personalizado",
-                 "Ej. 1 — Subsidio al transporte",
-                 "Ej. 2 — Precio máximo a alquileres"],
-                help=ayuda_preset,
-            )
-        if preset == "Ej. 1 — Subsidio al transporte":
-            da, db, dc, dd = 1500.0, 25.0, 0.0, 15.0
-        elif preset == "Ej. 2 — Precio máximo a alquileres":
-            da, db, dc, dd = 1800.0, 20.0, 0.0, 12.0
-        else:
-            da, db, dc, dd = 1000.0, 30.0, 0.0, 20.0
-
-        g = st.columns(4)
-        a = g[0].number_input("a · intercepto demanda", value=da, step=10.0,
-                              help="Cantidad demandada cuando el precio es 0 (Qd = a − bP).")
-        b = g[1].number_input("b · pendiente demanda", value=db, step=1.0, min_value=0.01,
-                              help="Cuánto cae la cantidad demandada por cada peso de aumento.")
-        c = g[2].number_input("c · intercepto oferta", value=dc, step=10.0,
-                              help="Cantidad ofrecida cuando el precio es 0 (Qo = c + dP).")
-        d = g[3].number_input("d · pendiente oferta", value=dd, step=1.0, min_value=0.01,
-                              help="Cuánto sube la cantidad ofrecida por cada peso de aumento.")
-        st.caption("Funciones:  Qd = a − bP    ·    Qo = c + dP")
+with st.expander("⚙  Parámetros del mercado y carga de datos del enunciado", expanded=True):
+    pc1, pc2 = st.columns([2, 3])
+    with pc1:
+        preset = st.selectbox(
+            "Cargar datos del enunciado",
+            ["Personalizado",
+             "Ej. 1 — Subsidio al transporte",
+             "Ej. 2 — Precio máximo a alquileres"],
+            help="Solo completa a, b, c, d y el valor de la política. "
+                 "No cambia de sección: usá la barra de arriba para navegar.",
+        )
+    if preset == "Ej. 1 — Subsidio al transporte":
+        da, db, dc, dd = 1500.0, 25.0, 0.0, 15.0
+    elif preset == "Ej. 2 — Precio máximo a alquileres":
+        da, db, dc, dd = 1800.0, 20.0, 0.0, 12.0
     else:
-        # En «Fórmulas» no se muestra el panel; usamos valores por defecto
-        # para que el resto del archivo no falle.
-        preset = "Personalizado"
-        a, b, c, d = 1000.0, 30.0, 0.0, 20.0
+        da, db, dc, dd = 1000.0, 30.0, 0.0, 20.0
+
+    g = st.columns(4)
+    a = g[0].number_input("a · intercepto demanda", value=da, step=10.0,
+                          help="Cantidad demandada cuando el precio es 0 (Qd = a − bP).")
+    b = g[1].number_input("b · pendiente demanda", value=db, step=1.0, min_value=0.01,
+                          help="Cuánto cae la cantidad demandada por cada peso de aumento.")
+    c = g[2].number_input("c · intercepto oferta", value=dc, step=10.0,
+                          help="Cantidad ofrecida cuando el precio es 0 (Qo = c + dP).")
+    d = g[3].number_input("d · pendiente oferta", value=dd, step=1.0, min_value=0.01,
+                          help="Cuánto sube la cantidad ofrecida por cada peso de aumento.")
+    st.caption("Funciones:  Qd = a − bP    ·    Qo = c + dP")
 
 # Defaults de política
 s_default = 8.0 if preset.startswith("Ej. 1") else 4.0
@@ -481,24 +462,18 @@ elif seccion_activa == "Subsidio (Ej. 1)":
                 f"pagan los contribuyentes) y el bienestar neto cae "
                 f"<b>${fmt(R['dwl'])}</b>: la pérdida de eficiencia (área coral).",
                 "warn")
-            st.write("")
-            lec(f"El <b>triángulo coral</b> del gráfico es la <b>pérdida de "
-                f"eficiencia</b>: con el subsidio el mercado transa "
-                f"<b>{fmt(R['Q1'])}</b> unidades en lugar de las <b>{fmt(Q0)}</b> de "
-                f"equilibrio. Esas <b>{fmt(R['Q1'] - Q0)}</b> unidades de más cuestan "
-                f"producirlas más de lo que los usuarios realmente las valoran, y esa "
-                f"diferencia (${fmt(R['dwl'])}) es bienestar que se pierde.", "info")
 
     st.write("")
     seccion("Bienestar", "Antes y después del subsidio")
     df_b = pd.DataFrame({
         "Concepto": ["Excedente del consumidor", "Excedente del productor",
                      "Gasto del Estado", "Bienestar total (W)"],
-        "Sin subsidio": [f"{R['EC0']:.2f}", f"{R['EP0']:.2f}", "0.00", f"{R['W0']:.2f}"],
-        "Con subsidio": [f"{R['EC1']:.2f}", f"{R['EP1']:.2f}",
-                         f"-{R['gasto']:.2f}", f"{R['W1']:.2f}"],
-        "Variación": [f"{R['EC1']-R['EC0']:+.2f}", f"{R['EP1']-R['EP0']:+.2f}",
-                      f"-{R['gasto']:.2f}", f"-{R['dwl']:.2f}"],
+        "Sin subsidio": [fmt(R['EC0']), fmt(R['EP0']), "0,00", fmt(R['W0'])],
+        "Con subsidio": [fmt(R['EC1']), fmt(R['EP1']),
+                         f"-{fmt(R['gasto'])}", fmt(R['W1'])],
+        "Variación": [f"{'+' if R['EC1']-R['EC0']>=0 else '-'}{fmt(abs(R['EC1']-R['EC0']))}",
+                      f"{'+' if R['EP1']-R['EP0']>=0 else '-'}{fmt(abs(R['EP1']-R['EP0']))}",
+                      f"-{fmt(R['gasto'])}", f"-{fmt(R['dwl'])}"],
     })
     st.dataframe(df_b, hide_index=True, use_container_width=True)
     csv_download(df_b, "bienestar_subsidio.csv", "⬇  Descargar tabla de bienestar (CSV)")
@@ -509,9 +484,9 @@ elif seccion_activa == "Subsidio (Ej. 1)":
     filas = []
     for sv in valores_s:
         r = bienestar_subsidio(a, b, c, d, float(sv))
-        filas.append({"Subsidio (s)": sv, "Cantidad": round(r["Q1"], 2),
-                      "Precio usuario": round(r["Pc"], 2), "Gasto público": round(r["gasto"], 2),
-                      "Bienestar total": round(r["W1"], 2), "Perdida eficiencia": round(r["dwl"], 2)})
+        filas.append({"Subsidio (s)": fmt(sv), "Cantidad": fmt(r["Q1"]),
+                      "Precio usuario": fmt(r["Pc"]), "Gasto público": fmt(r["gasto"]),
+                      "Bienestar total": fmt(r["W1"]), "Perdida eficiencia": fmt(r["dwl"])})
     df_sim = pd.DataFrame(filas)
     st.dataframe(df_sim, hide_index=True, use_container_width=True)
     csv_download(df_sim, "simulacion_subsidio.csv", "⬇  Descargar simulación (CSV)")
@@ -637,14 +612,6 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
                 f"<b>{fmt(R['escasez'])}</b> u. Ganan los inquilinos que consiguen "
                 f"contrato; pierden los propietarios y quienes quedan sin vivienda. "
                 f"El bienestar cae <b>${fmt(R['dwl'])}</b>.", "bad")
-            st.write("")
-            lec(f"El <b>triángulo coral</b> del gráfico es la <b>pérdida de "
-                f"eficiencia</b>: con el tope solo se transan <b>{fmt(R['Qt'])}</b> "
-                f"unidades en lugar de las <b>{fmt(Q0)}</b> de equilibrio. Esas "
-                f"<b>{fmt(Q0 - R['Qt'])}</b> unidades que dejan de intercambiarse "
-                f"habrían generado valor tanto para inquilinos como para propietarios, "
-                f"y ese valor perdido (${fmt(R['dwl'])}) es bienestar que desaparece.",
-                "info")
         else:
             lec(f"El tope de ${fmt(ptecho)} está por encima del equilibrio "
                 f"(${fmt(P0)}): <b>no es vinculante</b> y el mercado opera como si no "
@@ -655,10 +622,11 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
     df_b = pd.DataFrame({
         "Concepto": ["Excedente del consumidor", "Excedente del productor",
                      "Bienestar total (W)"],
-        "Sin tope": [f"{R['EC0']:.2f}", f"{R['EP0']:.2f}", f"{R['W0']:.2f}"],
-        "Con tope": [f"{R['EC1']:.2f}", f"{R['EP1']:.2f}", f"{R['W1']:.2f}"],
-        "Variación": [f"{R['EC1']-R['EC0']:+.2f}", f"{R['EP1']-R['EP0']:+.2f}",
-                      f"-{R['dwl']:.2f}"],
+        "Sin tope": [fmt(R['EC0']), fmt(R['EP0']), fmt(R['W0'])],
+        "Con tope": [fmt(R['EC1']), fmt(R['EP1']), fmt(R['W1'])],
+        "Variación": [f"{'+' if R['EC1']-R['EC0']>=0 else '-'}{fmt(abs(R['EC1']-R['EC0']))}",
+                      f"{'+' if R['EP1']-R['EP0']>=0 else '-'}{fmt(abs(R['EP1']-R['EP0']))}",
+                      f"-{fmt(R['dwl'])}"],
     })
     st.dataframe(df_b, hide_index=True, use_container_width=True)
     csv_download(df_b, "bienestar_precio_maximo.csv", "⬇  Descargar tabla de bienestar (CSV)")
@@ -670,9 +638,9 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
     filas = []
     for pv in valores_p:
         r = resolver_precio_maximo(a, b, c, d, float(pv))
-        filas.append({"Precio max": pv, "Cant. demandada": round(r["Qd"], 2),
-                      "Cant. ofrecida": round(r["Qo"], 2),
-                      "Escasez": round(r["escasez"], 2) if r["vinculante"] else 0,
+        filas.append({"Precio max": fmt(pv), "Cant. demandada": fmt(r["Qd"]),
+                      "Cant. ofrecida": fmt(r["Qo"]),
+                      "Escasez": fmt(r["escasez"]) if r["vinculante"] else "0,00",
                       "Vinculante": "Si" if r["vinculante"] else "No"})
     df_sim = pd.DataFrame(filas)
     st.dataframe(df_sim, hide_index=True, use_container_width=True)
@@ -687,9 +655,9 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
                                   line=dict(color=COL_EQ, width=3), fill="tozeroy",
                                   fillcolor="rgba(224,101,91,0.15)"))
         figs.add_vline(x=ptecho, line_dash="dash", line_color="#8493ab",
-                       annotation_text=f"Pmáx actual = {fmt(ptecho)}")
+                       annotation_text=f"Pmáx = {fmt(ptecho)}")
         figs.add_vline(x=P0, line_dash="dot", line_color=COL_OFE,
-                       annotation_text=f"Equilibrio P* = {fmt(P0)} (umbral de escasez)")
+                       annotation_text=f"P* = {fmt(P0)}")
         figs.update_layout(height=340, paper_bgcolor=PAPER, plot_bgcolor=PLOT_BG,
                            font=dict(family="Inter, sans-serif", color="#cdd9ec"),
                            xaxis_title="Precio máximo", yaxis_title="Escasez (u.)",
@@ -709,8 +677,9 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
 # ======================================================================
 elif seccion_activa == "Comparador":
     seccion("Función avanzada", "Comparador de escenarios")
-    lec("A continuación, configure 2 políticas y compare los efectos de las mismas "
-        "sobre un mismo mercado.", "info")
+    lec("Configurá dos políticas y compará su efecto sobre el mismo mercado. "
+        "Útil para responder: ¿conviene un subsidio chico o uno grande? "
+        "¿un tope de 40 o de 50?", "info")
     st.write("")
 
     cA, cB = st.columns(2, gap="large")
@@ -750,7 +719,7 @@ elif seccion_activa == "Comparador":
     for col in ["Cantidad", "Precio usuario", "Costo fiscal", "Bienestar (W)", "Pérdida eficiencia"]:
         df_cmp_fmt[col] = df_cmp[col].map(lambda x: fmt(x))
     st.dataframe(df_cmp_fmt, use_container_width=True)
-    csv_download(df_cmp.reset_index(), "comparador_escenarios.csv",
+    csv_download(df_cmp_fmt.reset_index(), "comparador_escenarios.csv",
                  "⬇  Descargar comparación (CSV)")
 
     # Veredicto automático
@@ -760,10 +729,9 @@ elif seccion_activa == "Comparador":
     else:
         mejor = "A" if wa > wb else "B"
         lec(f"En términos de <b>bienestar total</b>, el <b>Escenario {mejor}</b> es "
-            f"superior (${fmt(max(wa, wb))} frente a ${fmt(min(wa, wb))}).<br><br>"
-            f"En casos reales, el bienestar no es el único criterio ya que una "
-            f"política puede preferirse por razones distributivas aunque se esté "
-            f"sacrificando algo de eficiencia.", "ok")
+            f"superior (${fmt(max(wa, wb))} frente a ${fmt(min(wa, wb))}). Recordá "
+            f"que el bienestar no es el único criterio: una política puede preferirse "
+            f"por razones distributivas aunque sacrifique algo de eficiencia.", "ok")
 
 # ======================================================================
 # SECCIÓN 5 — FÓRMULAS
@@ -783,4 +751,8 @@ else:
     st.markdown("**Precio máximo (vinculante si Pmáx < P\\*)**")
     st.latex(r"Q_d = a - bP_{max}, \quad Q_o = c + dP_{max}, \quad \text{Escasez} = Q_d - Q_o")
     st.markdown("<hr class='regla'>", unsafe_allow_html=True)
+    lec("La <b>pérdida de eficiencia</b> es el bienestar que desaparece porque la "
+        "cantidad transada se aleja de la de equilibrio. En el subsidio se transan "
+        "unidades de más; en el precio máximo, de menos. El triángulo coral del "
+        "gráfico mide esa pérdida.", "info")
     st.caption("App del TP N.º 2 · Economía para Ingenieros · UNSTA")
