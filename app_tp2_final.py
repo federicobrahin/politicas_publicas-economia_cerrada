@@ -4,16 +4,6 @@ SIMULADOR DE POLÍTICAS PÚBLICAS EN ECONOMÍA CERRADA  —  VERSIÓN FINAL
 Trabajo Práctico N.º 2 — Economía para Ingenieros — UNSTA
 Prof. Antonio Raúl García
 
-Diseño: estética "cuaderno técnico" en modo OSCURO, con navegación en
-barra superior (no lateral) y panel de parámetros plegable y centrado.
-
-Funciones PRO (desafío +10% y extra):
-  - Comparador de escenarios A vs B lado a lado
-  - Exportación de todas las tablas a CSV (descarga)
-  - Análisis de sensibilidad (gasto y pérdida de eficiencia vs política)
-  - Excedentes graficados + puntos rotulados con letras (A, B, C)
-  - Indicador de eficiencia del gasto, lecturas económicas automáticas
-
 Integrantes:
   * Antúnez Ruiz Huidobro, Facundo
   * Brahin, Federico Tomás
