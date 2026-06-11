@@ -4,6 +4,16 @@ SIMULADOR DE POLÍTICAS PÚBLICAS EN ECONOMÍA CERRADA  —  VERSIÓN FINAL
 Trabajo Práctico N.º 2 — Economía para Ingenieros — UNSTA
 Prof. Antonio Raúl García
 
+Diseño: estética "cuaderno técnico" en modo OSCURO, con navegación en
+barra superior (no lateral) y panel de parámetros plegable y centrado.
+
+Funciones PRO (desafío +10% y extra):
+  - Comparador de escenarios A vs B lado a lado
+  - Exportación de todas las tablas a CSV (descarga)
+  - Análisis de sensibilidad (gasto y pérdida de eficiencia vs política)
+  - Excedentes graficados + puntos rotulados con letras (A, B, C)
+  - Indicador de eficiencia del gasto, lecturas económicas automáticas
+
 Integrantes:
   * Antúnez Ruiz Huidobro, Facundo
   * Brahin, Federico Tomás
@@ -257,35 +267,56 @@ with nav_cols[1]:
 
 # ----------------------------------------------------------------------
 # PANEL DE PARÁMETROS — franja superior plegable y centrada
+# (se oculta en la sección «Fórmulas», pero las variables se siguen
+#  calculando para no romper el resto de la app)
 # ----------------------------------------------------------------------
-with st.expander("⚙  Parámetros del mercado y carga de datos del enunciado", expanded=True):
-    pc1, pc2 = st.columns([2, 3])
-    with pc1:
-        preset = st.selectbox(
-            "Cargar datos del enunciado",
-            ["Personalizado",
-             "Ej. 1 — Subsidio al transporte",
-             "Ej. 2 — Precio máximo a alquileres"],
-            help="Solo completa a, b, c, d y el valor de la política. "
-                 "No cambia de sección: usá la barra de arriba para navegar.",
-        )
-    if preset == "Ej. 1 — Subsidio al transporte":
-        da, db, dc, dd = 1500.0, 25.0, 0.0, 15.0
-    elif preset == "Ej. 2 — Precio máximo a alquileres":
-        da, db, dc, dd = 1800.0, 20.0, 0.0, 12.0
-    else:
-        da, db, dc, dd = 1000.0, 30.0, 0.0, 20.0
+# Tooltip del selector según la sección activa
+if seccion_activa in ("Subsidio (Ej. 1)", "Precio máximo (Ej. 2)"):
+    ayuda_preset = "Completar a, b, c, d y el valor de la política."
+else:
+    ayuda_preset = "Completar a, b, c, d"
 
-    g = st.columns(4)
-    a = g[0].number_input("a · intercepto demanda", value=da, step=10.0,
-                          help="Cantidad demandada cuando el precio es 0 (Qd = a − bP).")
-    b = g[1].number_input("b · pendiente demanda", value=db, step=1.0, min_value=0.01,
-                          help="Cuánto cae la cantidad demandada por cada peso de aumento.")
-    c = g[2].number_input("c · intercepto oferta", value=dc, step=10.0,
-                          help="Cantidad ofrecida cuando el precio es 0 (Qo = c + dP).")
-    d = g[3].number_input("d · pendiente oferta", value=dd, step=1.0, min_value=0.01,
-                          help="Cuánto sube la cantidad ofrecida por cada peso de aumento.")
-    st.caption("Funciones:  Qd = a − bP    ·    Qo = c + dP")
+mostrar_panel = seccion_activa != "Fórmulas"
+
+if mostrar_panel:
+    panel = st.expander("⚙  Parámetros del mercado y carga de datos del enunciado",
+                        expanded=True)
+else:
+    panel = st.container()  # contenedor invisible: agrupa los widgets sin mostrarlos
+
+with panel:
+    if mostrar_panel:
+        pc1, pc2 = st.columns([2, 3])
+        with pc1:
+            preset = st.selectbox(
+                "Cargar datos del enunciado",
+                ["Personalizado",
+                 "Ej. 1 — Subsidio al transporte",
+                 "Ej. 2 — Precio máximo a alquileres"],
+                help=ayuda_preset,
+            )
+        if preset == "Ej. 1 — Subsidio al transporte":
+            da, db, dc, dd = 1500.0, 25.0, 0.0, 15.0
+        elif preset == "Ej. 2 — Precio máximo a alquileres":
+            da, db, dc, dd = 1800.0, 20.0, 0.0, 12.0
+        else:
+            da, db, dc, dd = 1000.0, 30.0, 0.0, 20.0
+
+        g = st.columns(4)
+        a = g[0].number_input("a · intercepto demanda", value=da, step=10.0,
+                              help="Cantidad demandada cuando el precio es 0 (Qd = a − bP).")
+        b = g[1].number_input("b · pendiente demanda", value=db, step=1.0, min_value=0.01,
+                              help="Cuánto cae la cantidad demandada por cada peso de aumento.")
+        c = g[2].number_input("c · intercepto oferta", value=dc, step=10.0,
+                              help="Cantidad ofrecida cuando el precio es 0 (Qo = c + dP).")
+        d = g[3].number_input("d · pendiente oferta", value=dd, step=1.0, min_value=0.01,
+                              help="Cuánto sube la cantidad ofrecida por cada peso de aumento.")
+        st.caption("Funciones:  Qd = a − bP    ·    Qo = c + dP")
+    else:
+        # En «Fórmulas» no se muestra el panel; usamos valores por defecto
+        # para que el resto del archivo no falle.
+        preset = "Personalizado"
+        a, b, c, d = 1000.0, 30.0, 0.0, 20.0
 
 # Defaults de política
 s_default = 8.0 if preset.startswith("Ej. 1") else 4.0
@@ -452,6 +483,13 @@ elif seccion_activa == "Subsidio (Ej. 1)":
                 f"pagan los contribuyentes) y el bienestar neto cae "
                 f"<b>${fmt(R['dwl'])}</b>: la pérdida de eficiencia (área coral).",
                 "warn")
+            st.write("")
+            lec(f"El <b>triángulo coral</b> del gráfico es la <b>pérdida de "
+                f"eficiencia</b>: con el subsidio el mercado transa "
+                f"<b>{fmt(R['Q1'])}</b> unidades en lugar de las <b>{fmt(Q0)}</b> de "
+                f"equilibrio. Esas <b>{fmt(R['Q1'] - Q0)}</b> unidades de más cuestan "
+                f"producirlas más de lo que los usuarios realmente las valoran, y esa "
+                f"diferencia (${fmt(R['dwl'])}) es bienestar que se pierde.", "info")
 
     st.write("")
     seccion("Bienestar", "Antes y después del subsidio")
@@ -602,6 +640,14 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
                 f"<b>{fmt(R['escasez'])}</b> u. Ganan los inquilinos que consiguen "
                 f"contrato; pierden los propietarios y quienes quedan sin vivienda. "
                 f"El bienestar cae <b>${fmt(R['dwl'])}</b>.", "bad")
+            st.write("")
+            lec(f"El <b>triángulo coral</b> del gráfico es la <b>pérdida de "
+                f"eficiencia</b>: con el tope solo se transan <b>{fmt(R['Qt'])}</b> "
+                f"unidades en lugar de las <b>{fmt(Q0)}</b> de equilibrio. Esas "
+                f"<b>{fmt(Q0 - R['Qt'])}</b> unidades que dejan de intercambiarse "
+                f"habrían generado valor tanto para inquilinos como para propietarios, "
+                f"y ese valor perdido (${fmt(R['dwl'])}) es bienestar que desaparece.",
+                "info")
         else:
             lec(f"El tope de ${fmt(ptecho)} está por encima del equilibrio "
                 f"(${fmt(P0)}): <b>no es vinculante</b> y el mercado opera como si no "
@@ -645,9 +691,9 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
                                   line=dict(color=COL_EQ, width=3), fill="tozeroy",
                                   fillcolor="rgba(224,101,91,0.15)"))
         figs.add_vline(x=ptecho, line_dash="dash", line_color="#8493ab",
-                       annotation_text=f"Pmáx = {fmt(ptecho)}")
+                       annotation_text=f"Pmáx actual = {fmt(ptecho)}")
         figs.add_vline(x=P0, line_dash="dot", line_color=COL_OFE,
-                       annotation_text=f"P* = {fmt(P0)}")
+                       annotation_text=f"Equilibrio P* = {fmt(P0)} (umbral de escasez)")
         figs.update_layout(height=340, paper_bgcolor=PAPER, plot_bgcolor=PLOT_BG,
                            font=dict(family="Inter, sans-serif", color="#cdd9ec"),
                            xaxis_title="Precio máximo", yaxis_title="Escasez (u.)",
@@ -667,9 +713,8 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
 # ======================================================================
 elif seccion_activa == "Comparador":
     seccion("Función avanzada", "Comparador de escenarios")
-    lec("Configurá dos políticas y compará su efecto sobre el mismo mercado. "
-        "Útil para responder: ¿conviene un subsidio chico o uno grande? "
-        "¿un tope de 40 o de 50?", "info")
+    lec("A continuación, configure 2 políticas y compare los efectos de las mismas "
+        "sobre un mismo mercado.", "info")
     st.write("")
 
     cA, cB = st.columns(2, gap="large")
@@ -719,9 +764,10 @@ elif seccion_activa == "Comparador":
     else:
         mejor = "A" if wa > wb else "B"
         lec(f"En términos de <b>bienestar total</b>, el <b>Escenario {mejor}</b> es "
-            f"superior (${fmt(max(wa, wb))} frente a ${fmt(min(wa, wb))}). Recordá "
-            f"que el bienestar no es el único criterio: una política puede preferirse "
-            f"por razones distributivas aunque sacrifique algo de eficiencia.", "ok")
+            f"superior (${fmt(max(wa, wb))} frente a ${fmt(min(wa, wb))}).<br><br>"
+            f"En casos reales, el bienestar no es el único criterio ya que una "
+            f"política puede preferirse por razones distributivas aunque se esté "
+            f"sacrificando algo de eficiencia.", "ok")
 
 # ======================================================================
 # SECCIÓN 5 — FÓRMULAS
@@ -741,8 +787,4 @@ else:
     st.markdown("**Precio máximo (vinculante si Pmáx < P\\*)**")
     st.latex(r"Q_d = a - bP_{max}, \quad Q_o = c + dP_{max}, \quad \text{Escasez} = Q_d - Q_o")
     st.markdown("<hr class='regla'>", unsafe_allow_html=True)
-    lec("La <b>pérdida de eficiencia</b> es el bienestar que desaparece porque la "
-        "cantidad transada se aleja de la de equilibrio. En el subsidio se transan "
-        "unidades de más; en el precio máximo, de menos. El triángulo coral del "
-        "gráfico mide esa pérdida.", "info")
     st.caption("App del TP N.º 2 · Economía para Ingenieros · UNSTA")
