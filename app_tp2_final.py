@@ -1,23 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-SIMULADOR DE POLÍTICAS PÚBLICAS EN ECONOMÍA CERRADA  —  VERSIÓN FINAL
-Trabajo Práctico N.º 2 — Economía para Ingenieros — UNSTA
-Prof. Antonio Raúl García
-
-Diseño: estética "cuaderno técnico" en modo OSCURO, con navegación en
-barra superior (no lateral) y panel de parámetros plegable y centrado.
-
-Funciones PRO (desafío +10% y extra):
-  - Comparador de escenarios A vs B lado a lado
-  - Exportación de todas las tablas a CSV (descarga)
-  - Análisis de sensibilidad (gasto y pérdida de eficiencia vs política)
-  - Excedentes graficados + puntos rotulados con letras (A, B, C)
-  - Indicador de eficiencia del gasto, lecturas económicas automáticas
+Simulador de Políticas Públicas en Economía Cerrada
+Trabajo Práctico N.º 2 — Economía para Ingenieros — UNSTA — Prof. Antonio Raúl García
 
 Integrantes:
   * Antúnez Ruiz Huidobro, Facundo
   * Brahin, Federico Tomás
-  * Gordillo Toledo, Rodrigo Gabriel
+  * Toledo Gordillo, Rodrigo Gabriel
   * Matos Villalba, Luis Humberto
 
 Ejecutar con:  streamlit run app_tp2_final.py
@@ -74,6 +63,13 @@ st.markdown(
                 letter-spacing:0.22em; text-transform:uppercase; color:#d98a4f; }
     .cab h1 { font-size: 2.0rem; margin: 4px 0 2px 0; }
     .cab .sub { color:#94a3b8; font-size:0.9rem; }
+    .cab .integrantes {
+        margin-top: 10px; padding-top: 10px;
+        border-top: 1px solid #283149;
+        color:#b8c4d6; font-size:0.82rem; font-weight:500;
+        font-family:'Inter',sans-serif;
+        max-width: 760px; margin-left:auto; margin-right:auto;
+    }
 
     /* Tarjetas de dato */
     .dato {
@@ -226,6 +222,22 @@ def grilla_precios(a, b, c, d, extra_top=1.15):
     p_top = (a / b) * extra_top
     return np.linspace(0, p_top, 200), p_top
 
+def curva_demanda(a, b, p_top):
+    """Devuelve (Q, P) de la demanda SOLO en el tramo con cantidad >= 0.
+    Evita el artefacto visual de np.clip, que dejaba la curva pegada al eje Y
+    (un falso 'quiebre' hacia arriba) cuando el precio superaba el intercepto a/b.
+    La demanda llega hasta P = a/b (donde Q = 0) y ahí termina."""
+    p_max_dem = min(a / b, p_top)
+    p = np.linspace(0, p_max_dem, 200)
+    q = a - b * p
+    return q, p
+
+def curva_oferta(c, d, p_top):
+    """Devuelve (Q, P) de la oferta en el rango de precios, con cantidad >= 0."""
+    p = np.linspace(0, p_top, 200)
+    q = np.clip(c + d * p, 0, None)
+    return q, p
+
 def base_layout(fig, a, p_top, titulo):
     fig.update_layout(
         title=dict(text=titulo, font=dict(family="Fraunces, serif", size=17, color="#f3efe6")),
@@ -252,6 +264,7 @@ st.markdown(
       <div class='sup'>TP N.º 2 · Economía para Ingenieros · UNSTA · Prof. R. García</div>
       <h1>Laboratorio de Políticas Públicas</h1>
       <div class='sub'>Mercados en economía cerrada · subsidios y controles de precios</div>
+      <div class='integrantes'>Antúnez Ruiz Huidobro, Facundo · Brahin, Federico Tomás · Toledo Gordillo, Rodrigo Gabriel · Matos Villalba, Luis Humberto</div>
     </div>
     """, unsafe_allow_html=True)
 st.write("")
@@ -344,8 +357,8 @@ if seccion_activa == "Mercado y excedentes":
     colg, colr = st.columns([3, 2], gap="large")
     with colg:
         p_arr, p_top = grilla_precios(a, b, c, d)
-        qd = np.clip(a - b * p_arr, 0, None)
-        qo = np.clip(c + d * p_arr, 0, None)
+        qd_x, qd_y = curva_demanda(a, b, p_top)
+        qo_x, qo_y = curva_oferta(c, d, p_top)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=[0, 0, Q0], y=[P0, a / b, P0], fill="toself",
                                  fillcolor=COL_EC, line=dict(width=0),
@@ -353,9 +366,9 @@ if seccion_activa == "Mercado y excedentes":
         fig.add_trace(go.Scatter(x=[0, 0, Q0], y=[P0, max(-c / d, 0), P0], fill="toself",
                                  fillcolor=COL_EP, line=dict(width=0),
                                  name="Excedente productor", hoverinfo="skip"))
-        fig.add_trace(go.Scatter(x=qd, y=p_arr, name="Demanda",
+        fig.add_trace(go.Scatter(x=qd_x, y=qd_y, name="Demanda",
                                  line=dict(color=COL_DEM, width=3)))
-        fig.add_trace(go.Scatter(x=qo, y=p_arr, name="Oferta",
+        fig.add_trace(go.Scatter(x=qo_x, y=qo_y, name="Oferta",
                                  line=dict(color=COL_OFE, width=3)))
         fig.add_trace(go.Scatter(x=[Q0], y=[P0], mode="markers+text", text=["C"],
                                  textposition="top center",
@@ -410,8 +423,8 @@ elif seccion_activa == "Subsidio (Ej. 1)":
     colg, colr = st.columns([3, 2], gap="large")
     with colg:
         p_arr, p_top = grilla_precios(a, b, c, d)
-        qd = np.clip(a - b * p_arr, 0, None)
-        qo = np.clip(c + d * p_arr, 0, None)
+        qd_x, qd_y = curva_demanda(a, b, p_top)
+        qo_x, qo_y = curva_oferta(c, d, p_top)
         qo_sub = np.clip(c + d * (p_arr + s), 0, None)
         fig = go.Figure()
         if s > 0:
@@ -421,9 +434,9 @@ elif seccion_activa == "Subsidio (Ej. 1)":
             fig.add_trace(go.Scatter(x=[0, 0, R["Q1"]], y=[R["Pv"], max(-c / d, 0), R["Pv"]],
                                      fill="toself", fillcolor=COL_EP, line=dict(width=0),
                                      name="Excedente productor", hoverinfo="skip"))
-        fig.add_trace(go.Scatter(x=qd, y=p_arr, name="Demanda",
+        fig.add_trace(go.Scatter(x=qd_x, y=qd_y, name="Demanda",
                                  line=dict(color=COL_DEM, width=3)))
-        fig.add_trace(go.Scatter(x=qo, y=p_arr, name="Oferta original",
+        fig.add_trace(go.Scatter(x=qo_x, y=qo_y, name="Oferta original",
                                  line=dict(color=COL_OFE, width=3)))
         if s > 0:
             fig.add_trace(go.Scatter(x=qo_sub, y=p_arr, name="Oferta con subsidio",
@@ -507,13 +520,15 @@ elif seccion_activa == "Subsidio (Ej. 1)":
     csv_download(df_b, "bienestar_subsidio.csv", "⬇  Descargar tabla de bienestar (CSV)")
 
     st.write("")
-    seccion("Simulación", "Barrido de subsidios")
+    seccion("Simulación", "Barrido de subsidios (análisis de sensibilidad)")
     valores_s = [0, 5, 10, 15, 20] if preset.startswith("Ej. 1") else [0, 2, 4, 6, 8, 10]
     filas = []
     for sv in valores_s:
         r = bienestar_subsidio(a, b, c, d, float(sv))
         filas.append({"Subsidio (s)": fmt(sv), "Cantidad": fmt(r["Q1"]),
-                      "Precio usuario": fmt(r["Pc"]), "Gasto público": fmt(r["gasto"]),
+                      "Precio usuario": fmt(r["Pc"]),
+                      "Exc. consumidor": fmt(r["EC1"]), "Exc. productor": fmt(r["EP1"]),
+                      "Gasto público": fmt(r["gasto"]),
                       "Bienestar total": fmt(r["W1"]), "Perdida eficiencia": fmt(r["dwl"])})
     df_sim = pd.DataFrame(filas)
     st.dataframe(df_sim, hide_index=True, use_container_width=True)
@@ -532,10 +547,17 @@ elif seccion_activa == "Subsidio (Ej. 1)":
                                   line=dict(color=COL_EQ, width=3)))
         figs.add_vline(x=s, line_dash="dash", line_color="#8493ab",
                        annotation_text=f"s = {fmt(s)}")
+        # Ticks del eje Y con la palabra "mil" en lugar de la "k" por defecto.
+        # El paso se elige para mostrar ~6-8 marcas y evitar amontonamiento.
+        y_max_sens = max(max(gasto_grid), max(dwl_grid)) if (gasto_grid or dwl_grid) else 0
+        paso_y = max(1000, round((y_max_sens / 6) / 1000) * 1000)
+        tickvals_y = list(range(0, int(y_max_sens) + paso_y, paso_y))
+        ticktext_y = [("0" if v == 0 else f"{v/1000:.0f} mil") for v in tickvals_y]
         figs.update_layout(height=340, paper_bgcolor=PAPER, plot_bgcolor=PLOT_BG,
                            font=dict(family="Inter, sans-serif", color="#cdd9ec"),
-                           xaxis_title="Subsidio por unidad (s)", yaxis_title="$",
-                           xaxis=dict(gridcolor=GRID), yaxis=dict(gridcolor=GRID),
+                           xaxis_title="Subsidio por unidad (s)", yaxis_title="Precio ($)",
+                           xaxis=dict(gridcolor=GRID),
+                           yaxis=dict(gridcolor=GRID, tickvals=tickvals_y, ticktext=ticktext_y),
                            legend=dict(orientation="h", y=-0.25))
         st.plotly_chart(figs, use_container_width=True)
         lec("El gasto crece de forma aproximadamente lineal con el subsidio, pero "
@@ -566,8 +588,8 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
     colg, colr = st.columns([3, 2], gap="large")
     with colg:
         p_arr, p_top = grilla_precios(a, b, c, d)
-        qd = np.clip(a - b * p_arr, 0, None)
-        qo = np.clip(c + d * p_arr, 0, None)
+        qd_x, qd_y = curva_demanda(a, b, p_top)
+        qo_x, qo_y = curva_oferta(c, d, p_top)
         fig = go.Figure()
         if R["vinculante"]:
             Qt = R["Qt"]
@@ -585,9 +607,9 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
             fig.add_trace(go.Scatter(x=[0, 0, Q0], y=[P0, max(-c / d, 0), P0], fill="toself",
                                      fillcolor=COL_EP, line=dict(width=0),
                                      name="Excedente productor", hoverinfo="skip"))
-        fig.add_trace(go.Scatter(x=qd, y=p_arr, name="Demanda",
+        fig.add_trace(go.Scatter(x=qd_x, y=qd_y, name="Demanda",
                                  line=dict(color=COL_DEM, width=3)))
-        fig.add_trace(go.Scatter(x=qo, y=p_arr, name="Oferta",
+        fig.add_trace(go.Scatter(x=qo_x, y=qo_y, name="Oferta",
                                  line=dict(color=COL_OFE, width=3)))
         fig.add_hline(y=ptecho, line_dash="dash", line_color=COL_OFE2,
                       annotation_text="Precio máximo", annotation_position="top left")
@@ -668,15 +690,16 @@ elif seccion_activa == "Precio máximo (Ej. 2)":
     csv_download(df_b, "bienestar_precio_maximo.csv", "⬇  Descargar tabla de bienestar (CSV)")
 
     st.write("")
-    seccion("Simulación", "Barrido de precios máximos")
+    seccion("Simulación", "Barrido de precios máximos (análisis de sensibilidad)")
     valores_p = [70, 60, 50, 40, 30] if preset.startswith("Ej. 2") \
         else [round(P0 * x, 0) for x in (1.25, 1.0, 0.85, 0.7, 0.55)]
     filas = []
     for pv in valores_p:
-        r = resolver_precio_maximo(a, b, c, d, float(pv))
+        r = bienestar_precio_maximo(a, b, c, d, float(pv))
         filas.append({"Precio max": fmt(pv), "Cant. demandada": fmt(r["Qd"]),
                       "Cant. ofrecida": fmt(r["Qo"]),
                       "Escasez": fmt(r["escasez"]) if r["vinculante"] else "0,00",
+                      "Exc. consumidor": fmt(r["EC1"]), "Exc. productor": fmt(r["EP1"]),
                       "Vinculante": "Si" if r["vinculante"] else "No"})
     df_sim = pd.DataFrame(filas)
     st.dataframe(df_sim, hide_index=True, use_container_width=True)
@@ -731,6 +754,7 @@ elif seccion_activa == "Comparador":
                 resultados[etq] = {
                     "Política": f"Subsidio ${fmt(val)}",
                     "Cantidad": r["Q1"], "Precio usuario": r["Pc"],
+                    "Exc. consumidor": r["EC1"], "Exc. productor": r["EP1"],
                     "Costo fiscal": r["gasto"], "Bienestar (W)": r["W1"],
                     "Pérdida eficiencia": r["dwl"]}
             else:
@@ -740,6 +764,7 @@ elif seccion_activa == "Comparador":
                 resultados[etq] = {
                     "Política": f"Tope ${fmt(val)}",
                     "Cantidad": r["Qt"], "Precio usuario": val,
+                    "Exc. consumidor": r["EC1"], "Exc. productor": r["EP1"],
                     "Costo fiscal": 0.0, "Bienestar (W)": r["W1"],
                     "Pérdida eficiencia": r["dwl"]}
             r0 = resultados[etq]
@@ -748,10 +773,11 @@ elif seccion_activa == "Comparador":
             dato(dd2, "Pérdida efic.", f"${fmt(r0['Pérdida eficiencia'])}")
 
     st.write("")
-    seccion("Resultado", "Comparación lado a lado")
+    seccion("Resultado", "Comparación lado a lado (análisis de sensibilidad)")
     df_cmp = pd.DataFrame([resultados["A"], resultados["B"]], index=["Escenario A", "Escenario B"])
     df_cmp_fmt = df_cmp.copy()
-    for col in ["Cantidad", "Precio usuario", "Costo fiscal", "Bienestar (W)", "Pérdida eficiencia"]:
+    for col in ["Cantidad", "Precio usuario", "Exc. consumidor", "Exc. productor",
+                "Costo fiscal", "Bienestar (W)", "Pérdida eficiencia"]:
         df_cmp_fmt[col] = df_cmp[col].map(lambda x: fmt(x))
     st.dataframe(df_cmp_fmt, use_container_width=True)
     csv_download(df_cmp_fmt.reset_index(), "comparador_escenarios.csv",
@@ -774,17 +800,39 @@ elif seccion_activa == "Comparador":
 # ======================================================================
 else:
     seccion("Referencia", "Modelo económico y fórmulas")
-    st.markdown("**Funciones del mercado**")
+
+    st.markdown("##### Funciones del mercado")
+    st.caption("Definen la demanda y la oferta lineales a partir de los parámetros.")
     st.latex(r"Q_d = a - bP \qquad Q_o = c + dP")
-    st.markdown("**Equilibrio competitivo**")
+
+    st.markdown("##### Equilibrio competitivo")
+    st.caption("Precio y cantidad donde la cantidad ofrecida iguala a la demandada.")
     st.latex(r"P^* = \frac{a - c}{b + d} \qquad Q^* = a - bP^*")
-    st.markdown("**Excedentes**")
-    st.latex(r"EC = \tfrac{1}{2}\,Q\,(\tfrac{a}{b} - P_{pagado})")
-    st.latex(r"EP = P_{recibido}\cdot Q - \frac{1}{d}\!\left(\frac{Q^2}{2} - cQ\right)")
-    st.markdown("**Subsidio por unidad (s)**")
+
+    st.markdown("##### Excedente del consumidor — sin intervención (libre mercado)")
+    st.caption("Es el área del triángulo entre la curva de demanda y el precio de "
+               "equilibrio. Se usa cuando el Estado no interviene.")
+    st.latex(r"EC_{\text{libre}} = \tfrac{1}{2}\,Q^*\left(\tfrac{a}{b} - P^*\right)")
+
+    st.markdown("##### Excedente del consumidor — con intervención")
+    st.caption("Cuando hay un precio máximo o un subsidio, la zona deja de ser un "
+               "triángulo y pasa a ser un trapecio, porque al precio pagado (P_pag) "
+               "solo se transa la cantidad Q. Sus lados son las alturas de la demanda "
+               "en 0 y en Q.")
+    st.latex(r"EC_{\text{interv}} = \tfrac{1}{2}\,Q\left[\left(\tfrac{a}{b} - P_{pag}\right) + \left(P_{d}(Q) - P_{pag}\right)\right]")
+    st.caption("donde P_d(Q) = (a − Q)/b es la altura de la demanda en la cantidad transada Q.")
+
+    st.markdown("##### Excedente del productor")
+    st.caption("Área entre el precio recibido y la curva de oferta, desde 0 hasta Q.")
+    st.latex(r"EP = P_{rec}\cdot Q - \frac{1}{d}\!\left(\frac{Q^2}{2} - cQ\right)")
+
+    st.markdown("##### Subsidio por unidad (s)")
+    st.caption("Separa el precio que paga el consumidor (Pc) del que recibe el "
+               "productor (Pv) y determina el gasto del Estado y el bienestar.")
     st.latex(r"P_c = \frac{a - c - d\,s}{b + d}, \quad P_v = P_c + s, \quad Q_1 = a - bP_c")
     st.latex(r"\text{Gasto} = s\cdot Q_1 \qquad W = EC + EP - \text{Gasto}")
-    st.markdown("**Precio máximo (vinculante si Pmáx < P\\*)**")
+
+    st.markdown("##### Precio máximo (vinculante si Pmáx < P\\*)")
+    st.caption("Calcula la cantidad demandada, la ofrecida y la escasez resultante "
+               "cuando el tope está por debajo del equilibrio.")
     st.latex(r"Q_d = a - bP_{max}, \quad Q_o = c + dP_{max}, \quad \text{Escasez} = Q_d - Q_o")
-    st.markdown("<hr class='regla'>", unsafe_allow_html=True)
-    st.caption("App del TP N.º 2 · Economía para Ingenieros · UNSTA")
